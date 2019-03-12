@@ -30,10 +30,10 @@ var main = (async function () {
     const sourceUrl = buildRemoteUrl(process.env.RCLONE_SOURCE_TYPE, process.env.RCLONE_SOURCE_PATH);
     const destUrl = buildRemoteUrl(process.env.RCLONE_DEST_TYPE, process.env.RCLONE_DEST_PATH);
 
-    if (process.env.STRATEGY_MISSING != CONFLICT_STRATEGY.DO_NOTHING) {
+    const diffMap = await calculateDiff(sourceUrl, destUrl);
+    logger.info(diffMap);
 
-        const diffMap = await calculateDiff(sourceUrl, destUrl);
-        logger.info(diffMap);
+    if (process.env.STRATEGY_MISSING != CONFLICT_STRATEGY.DO_NOTHING) {
 
         var filesToDelete = [];
         var remoteUrl = '';
@@ -62,7 +62,6 @@ var main = (async function () {
     }
 
     await twoWayCopy(sourceUrl, destUrl);
-
 })();
 
 async function obscurePassword(password) {
