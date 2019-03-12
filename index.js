@@ -23,9 +23,6 @@ const CONFLICT_STRATEGY = {
     DO_NOTHING: 'do_nothing'
 };
 
-process.env.STRATEGY_MISSING = CONFLICT_STRATEGY.FROM_DEST;
-process.env.STRATEGY_SIZE_DIFFERENT = CONFLICT_STRATEGY.FROM_SOURCE;
-
 var main = (async function () {
 
     process.env.RCLONE_CONFIG_SFTP_PASS = await obscurePassword(process.env.RCLONE_CONFIG_SFTP_PASS_PLAIN);
