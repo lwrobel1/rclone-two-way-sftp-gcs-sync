@@ -114,11 +114,11 @@ async function calculateDiff(sourceUrl, destUrl) {
     const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list'];
 
     const sourceLsjsonArgs = commonArgs.splice(0);
-
     sourceLsjsonArgs.push(sourceUrl);
     logger.info(sourceLsjsonArgs);
     const sourceLsjsonOut = await spawnAndCaptureStdout('rclone', sourceLsjsonArgs);
 
+    const destLsjsonArgs = commonArgs.splice(0);
     destLsjsonArgs.push(destUrl);
     logger.info(destLsjsonArgs);
     const destLsjsonOut = await spawnAndCaptureStdout('rclone', destLsjsonArgs);
