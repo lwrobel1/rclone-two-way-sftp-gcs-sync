@@ -1,6 +1,12 @@
 const winston = require('winston');
 const {LoggingWinston} = require('@google-cloud/logging-winston')
 
+// const fs = require('fs');
+// process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE;
+// const {Storage} = require('@google-cloud/storage');
+// const storage = new Storage();
+// const bucket = storage.bucket(process.env.RCLONE_CONFIG_GCS_BUCKET_NAME);
+
 const loggingWinston = new LoggingWinston();
  
 const logger = winston.createLogger({
@@ -25,18 +31,7 @@ const CONFLICT_STRATEGY = {
 
 var main = (async function () {
 
-    const config = {
-        RCLONE_SOURCE_PATH: process.env.RCLONE_SOURCE_PATH,
-        RCLONE_SOURCE_TYPE: process.env.RCLONE_SOURCE_TYPE,
-        RCLONE_DEST_PATH: process.env.RCLONE_DEST_PATH,
-        RCLONE_DEST_TYPE: process.env.RCLONE_DEST_TYPE,
-        RCLONE_CONFIG_SFTP_HOST: process.env.RCLONE_CONFIG_SFTP_HOST,
-        RCLONE_CONFIG_SFTP_PORT: process.env.RCLONE_CONFIG_SFTP_PORT,
-        RCLONE_CONFIG_GCS_BUCKET_NAME: process.env.RCLONE_CONFIG_GCS_BUCKET_NAME,
-        STRATEGY_MISSING: process.env.STRATEGY_MISSING,
-        STRATEGY_SIZE_DIFFERENT: process.env.STRATEGY_SIZE_DIFFERENT
-    };
-    logger.info(config);
+    logConfiguration(logger);
 
     process.env.RCLONE_CONFIG_SFTP_PASS = await obscurePassword(process.env.RCLONE_CONFIG_SFTP_PASS_PLAIN);
 
@@ -46,7 +41,8 @@ var main = (async function () {
     const diffMap = await calculateDiff(sourceUrl, destUrl);
     logger.info(diffMap);
 
-    if (process.env.STRATEGY_MISSING != CONFLICT_STRATEGY.DO_NOTHING) {
+    // FIXME - deletion feature disabled; to be fixed later
+    if (process.env.STRATEGY_MISSING != CONFLICT_STRATEGY.DO_NOTHING && false) {
 
         var filesToDelete = [];
         var remoteUrl = '';
@@ -75,7 +71,27 @@ var main = (async function () {
     }
 
     await twoWayCopy(sourceUrl, destUrl);
+
+    // const filePath = './.init'
+    // fs.closeSync(fs.openSync(filePath, 'w'))
+    // await bucket.upload(filePath);
+
 })();
+
+function logConfiguration(logger) {
+    const config = {
+        RCLONE_SOURCE_PATH: process.env.RCLONE_SOURCE_PATH,
+        RCLONE_SOURCE_TYPE: process.env.RCLONE_SOURCE_TYPE,
+        RCLONE_DEST_PATH: process.env.RCLONE_DEST_PATH,
+        RCLONE_DEST_TYPE: process.env.RCLONE_DEST_TYPE,
+        RCLONE_CONFIG_SFTP_HOST: process.env.RCLONE_CONFIG_SFTP_HOST,
+        RCLONE_CONFIG_SFTP_PORT: process.env.RCLONE_CONFIG_SFTP_PORT,
+        RCLONE_CONFIG_GCS_BUCKET_NAME: process.env.RCLONE_CONFIG_GCS_BUCKET_NAME,
+        STRATEGY_MISSING: process.env.STRATEGY_MISSING,
+        STRATEGY_SIZE_DIFFERENT: process.env.STRATEGY_SIZE_DIFFERENT
+    };
+    logger.info(config);
+}
 
 async function obscurePassword(password) {
     return await spawnAndCaptureStdout('rclone', ['obscure', password]);
