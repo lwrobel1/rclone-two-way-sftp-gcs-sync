@@ -25,6 +25,19 @@ const CONFLICT_STRATEGY = {
 
 var main = (async function () {
 
+    const config = {
+        RCLONE_SOURCE_PATH: process.env.RCLONE_SOURCE_PATH,
+        RCLONE_SOURCE_TYPE: process.env.RCLONE_SOURCE_TYPE,
+        RCLONE_DEST_PATH: process.env.RCLONE_DEST_PATH,
+        RCLONE_DEST_TYPE: process.env.RCLONE_DEST_TYPE,
+        RCLONE_CONFIG_SFTP_HOST: process.env.RCLONE_CONFIG_SFTP_HOST,
+        RCLONE_CONFIG_SFTP_PORT: process.env.RCLONE_CONFIG_SFTP_PORT,
+        RCLONE_CONFIG_GCS_BUCKET_NAME: process.env.RCLONE_CONFIG_GCS_BUCKET_NAME,
+        STRATEGY_MISSING: process.env.STRATEGY_MISSING,
+        STRATEGY_SIZE_DIFFERENT: process.env.STRATEGY_SIZE_DIFFERENT
+    };
+    logger.info(config);
+
     process.env.RCLONE_CONFIG_SFTP_PASS = await obscurePassword(process.env.RCLONE_CONFIG_SFTP_PASS_PLAIN);
 
     const sourceUrl = buildRemoteUrl(process.env.RCLONE_SOURCE_TYPE, process.env.RCLONE_SOURCE_PATH);
