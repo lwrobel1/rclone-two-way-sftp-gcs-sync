@@ -1,12 +1,6 @@
 const winston = require('winston');
 const {LoggingWinston} = require('@google-cloud/logging-winston')
 
-// const fs = require('fs');
-// process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE;
-// const {Storage} = require('@google-cloud/storage');
-// const storage = new Storage();
-// const bucket = storage.bucket(process.env.RCLONE_CONFIG_GCS_BUCKET_NAME);
-
 const loggingWinston = new LoggingWinston();
  
 const logger = winston.createLogger({
@@ -71,10 +65,6 @@ var main = (async function () {
     }
 
     await twoWayCopy(sourceUrl, destUrl);
-
-    // const filePath = './.init'
-    // fs.closeSync(fs.openSync(filePath, 'w'))
-    // await bucket.upload(filePath);
 
 })();
 
