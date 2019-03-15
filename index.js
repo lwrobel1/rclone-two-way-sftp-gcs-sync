@@ -1,5 +1,8 @@
 const winston = require('winston');
 const {LoggingWinston} = require('@google-cloud/logging-winston')
+const fs = require('fs');
+const util = require('util');
+const {Storage} = require('@google-cloud/storage');
 
 const loggingWinston = new LoggingWinston();
  
@@ -18,66 +21,90 @@ const REMOTE_TYPE = {
 };
 
 const CONFLICT_STRATEGY = {
-    FROM_SOURCE: 'from_source',
-    FROM_DEST: 'from_dest',
-    DO_NOTHING: 'do_nothing'
+    FROM_SOURCE: 'match_source',
+    FROM_DEST: 'match_dest'
 };
+
+const CONFLICT_TYPE = {
+    ADDED: 'added',
+    DELETED_FROM_SOURCE: 'deleted_from_source',
+    DELETED_FROM_DEST: 'deleted_from_dest',
+    SIZE_DIFFERENT: 'size_different'
+};
+
+const STATE_FILE_PATH = '.state';
 
 var main = (async function () {
 
     logConfiguration(logger);
 
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE;
+    const storage = new Storage();
+    const bucket = storage.bucket(process.env.RCLONE_CONFIG_GCS_BUCKET_NAME);
+    const bucketStateFilePath = getInitFilePath();
+    const bucketStateFileExists = await bucketFileExists(bucket, bucketStateFilePath);
+
     process.env.RCLONE_CONFIG_SFTP_PASS = await obscurePassword(process.env.RCLONE_CONFIG_SFTP_PASS_PLAIN);
 
-    const sourceUrl = buildRemoteUrl(process.env.RCLONE_SOURCE_TYPE, process.env.RCLONE_SOURCE_PATH);
-    const destUrl = buildRemoteUrl(process.env.RCLONE_DEST_TYPE, process.env.RCLONE_DEST_PATH);
+    const sourceUrl = buildRemoteUrl(process.env.RCLONE_SOURCE_TYPE, process.env.RCLONE_SYNC_PATH);
+    const destUrl = buildRemoteUrl(process.env.RCLONE_DEST_TYPE, process.env.RCLONE_SYNC_PATH);
 
-    const diffMap = await calculateDiff(sourceUrl, destUrl);
-    logger.info(diffMap);
-
-    // FIXME - deletion feature disabled; to be fixed later
-    if (process.env.STRATEGY_MISSING != CONFLICT_STRATEGY.DO_NOTHING && false) {
-
-        var filesToDelete = [];
-        var remoteUrl = '';
-
-        if (process.env.STRATEGY_MISSING == CONFLICT_STRATEGY.FROM_SOURCE) {
-
-            diffMap.forEach((entry, key) => {
-                if (!entry.src && entry.dst) {
-                    filesToDelete.push(key);
-                }
-            });
-            remoteUrl = sourceUrl;
-
-        } else if (process.env.STRATEGY_MISSING == CONFLICT_STRATEGY.FROM_DEST) {
-
-            diffMap.forEach((entry, key) => {
-                if (entry.src && !entry.dst) {
-                    filesToDelete.push(key);
-                }
-            });
-            remoteUrl = destUrl;
-
-        }
-
-        await deleteFiles(filesToDelete, remoteUrl);
+    let lastSync = new Date().getTime();
+    if (bucketStateFileExists) {
+        await bucket.file(bucketStateFilePath).download({ destination: STATE_FILE_PATH });
+        lastSync = fs.readFileSync(STATE_FILE_PATH);
     }
 
-    await twoWayCopy(sourceUrl, destUrl);
+    const diffMap = await calculateDiff(sourceUrl, destUrl, lastSync, bucketStateFileExists);
+    logger.info(util.format(diffMap));
+
+    const filesToDelete = new Map();
+
+    diffMap.forEach((entry, key) => {
+        if (process.env.STRATEGY_DELETED == CONFLICT_STRATEGY.FROM_SOURCE && CONFLICT_TYPE.DELETED_FROM_SOURCE == entry.type) {
+            filesToDelete.set(key, destUrl);
+        } else if (process.env.STRATEGY_DELETED == CONFLICT_STRATEGY.FROM_DEST && CONFLICT_TYPE.DELETED_FROM_DEST == entry.type) {
+            filesToDelete.set(key, sourceUrl);
+        }
+    });
+
+    await deleteFiles(filesToDelete);
+
+    if (diffMap.size > 0) {
+        await twoWayCopy(sourceUrl, destUrl);
+        await storeStateFile(bucket, bucketStateFilePath);
+    }
 
 })();
 
+function getInitFilePath() {
+    return `${process.env.RCLONE_SYNC_PATH}/${STATE_FILE_PATH}`;
+}
+
+async function storeStateFile(bucket, bucketInitFilePath) {
+    fs.writeFileSync(STATE_FILE_PATH, new Date().getTime());
+    await bucket.upload(STATE_FILE_PATH, { destination: bucketInitFilePath });
+}
+
+async function bucketFileExists(bucket, bucketFilePath) {
+    const bucketFile = bucket.file(bucketFilePath);
+    const existsResponse = await bucketFile.exists();
+    if (existsResponse[0]) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 function logConfiguration(logger) {
     const config = {
-        RCLONE_SOURCE_PATH: process.env.RCLONE_SOURCE_PATH,
         RCLONE_SOURCE_TYPE: process.env.RCLONE_SOURCE_TYPE,
-        RCLONE_DEST_PATH: process.env.RCLONE_DEST_PATH,
         RCLONE_DEST_TYPE: process.env.RCLONE_DEST_TYPE,
+        RCLONE_SYNC_PATH: process.env.RCLONE_SYNC_PATH,
         RCLONE_CONFIG_SFTP_HOST: process.env.RCLONE_CONFIG_SFTP_HOST,
         RCLONE_CONFIG_SFTP_PORT: process.env.RCLONE_CONFIG_SFTP_PORT,
         RCLONE_CONFIG_GCS_BUCKET_NAME: process.env.RCLONE_CONFIG_GCS_BUCKET_NAME,
-        STRATEGY_MISSING: process.env.STRATEGY_MISSING,
+        STRATEGY_DELETED: process.env.STRATEGY_DELETED,
         STRATEGY_SIZE_DIFFERENT: process.env.STRATEGY_SIZE_DIFFERENT
     };
     logger.info(config);
@@ -87,12 +114,13 @@ async function obscurePassword(password) {
     return await spawnAndCaptureStdout('rclone', ['obscure', password]);
 }
 
-async function deleteFiles(files, remoteUrl) {
-    files.forEach(async (file) => {
+async function deleteFiles(filesToDelete) {
+    filesToDelete.forEach(async (remoteUrl, file) => {
         // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
         // FIXME:
         // possible fix: https://github.com/ncw/rclone/pull/3009
-        const args = ['delete', '--min-size', '12b', `${remoteUrl}/${file}`];
+        // const args = ['delete', '--min-size', '12b', `${remoteUrl}/${file}`];
+        const args = ['delete', `${remoteUrl}/${file}`];
         logger.info(args);
         await spawnAndCaptureStdout('rclone', args);
     });
@@ -124,7 +152,7 @@ async function twoWayCopy(sourceUrl, destUrl) {
     await spawnAndCaptureStdout('rclone', destToSourceArgs);
 }
 
-async function calculateDiff(sourceUrl, destUrl) {
+async function calculateDiff(sourceUrl, destUrl, lastSync, bucketStateFileExists) {
 
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
@@ -169,6 +197,14 @@ async function calculateDiff(sourceUrl, destUrl) {
     lsMap.forEach((entry, key, map) => {
         if ((entry.src || { size: -1 }).size == (entry.dst || { size: -1 }).size) {
             lsMap.delete(key);
+        } else if (entry.src && entry.dst) {
+            entry.type = CONFLICT_TYPE.SIZE_DIFFERENT;
+        } else if (entry.src && !entry.dst && new Date(entry.src.modTime).getTime() <= lastSync && bucketStateFileExists) {
+            entry.type = CONFLICT_TYPE.DELETED_FROM_DEST;
+        } else if (!entry.src && entry.dst && new Date(entry.dst.modTime).getTime() <= lastSync && bucketStateFileExists) {
+            entry.type = CONFLICT_TYPE.DELETED_FROM_SOURCE;
+        } else {
+            entry.type = CONFLICT_TYPE.ADDED;
         }
     });
 
