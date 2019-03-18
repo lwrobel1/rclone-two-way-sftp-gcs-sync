@@ -71,7 +71,7 @@ var main = (async function () {
     await deleteFiles(filesToDelete);
 
     if (diffMap.size > 0) {
-        await twoWayCopy(sourceUrl, destUrl);
+        await twoWayCopy(sourceUrl, destUrl, Array.from(diffMap.keys()));
         await storeStateFile(bucket, bucketStateFilePath);
     }
 
@@ -126,12 +126,19 @@ async function deleteFiles(filesToDelete) {
     });
 }
 
-async function twoWayCopy(sourceUrl, destUrl) {
+async function twoWayCopy(sourceUrl, destUrl, files) {
+
+    const includeFilePath = '.include';
+    fs.writeFileSync(includeFilePath, '');
+    files.forEach(file => {
+        fs.appendFileSync(includeFilePath, file);
+        fs.appendFileSync(includeFilePath, '\r\n');
+    });
 
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
     // possible fix: https://github.com/ncw/rclone/pull/3009
-    const commonArgs = ['copy', '--min-size', '12b', '--fast-list', '--no-update-modtime'];
+    const commonArgs = ['copy', '--min-size', '12b', '--fast-list', '--no-update-modtime', '--include-from', includeFilePath, '--ignore-case'];
 
     const sourceToDestArgs = commonArgs.slice(0);
     if (process.env.STRATEGY_SIZE_DIFFERENT != CONFLICT_STRATEGY.FROM_SOURCE) {
@@ -157,7 +164,7 @@ async function calculateDiff(sourceUrl, destUrl, lastSync, bucketStateFileExists
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
     // possible fix: https://github.com/ncw/rclone/pull/3009
-    const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list'];
+    const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list', '--exclude', '".*"'];
 
     const sourceLsjsonArgs = commonArgs.slice(0);
     sourceLsjsonArgs.push(sourceUrl);
