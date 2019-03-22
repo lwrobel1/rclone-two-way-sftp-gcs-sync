@@ -164,7 +164,7 @@ async function calculateDiff(sourceUrl, destUrl, lastSync, bucketStateFileExists
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
     // possible fix: https://github.com/ncw/rclone/pull/3009
-    const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list', '--exclude', '".*"'];
+    const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list', '--exclude', '.*'];
 
     const sourceLsjsonArgs = commonArgs.slice(0);
     sourceLsjsonArgs.push(sourceUrl);
