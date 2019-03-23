@@ -1,6 +1,6 @@
 # rclone-two-way-sftp-gcs-sync
 
-A dockerized nodejs app which uses [Rclone](https://rclone.org/) to perform a two-way file sync between **SFTP** and **Google Cloud Storage** remotes. Conflict resolution is controlled by environment variables: **STRATEGY_DELETED** and **STRATEGY_SIZE_DIFFERENT** which tell which remote should take precedence over the other. A single run performs a one-time sync. At least one remote **MUST** be a GCS remote because it's used to maintain state. Currently supports only username/password SFTP authentication.
+A dockerized nodejs app which uses [Rclone](https://rclone.org/) to perform a two-way file sync between **SFTP** and **Google Cloud Storage** remotes. Conflict resolution is controlled by environment variables: **STRATEGY_DELETED** and **STRATEGY_SIZE_DIFFERENT** which tell which remote should take precedence over the other. A single run performs a one-time sync. At least one remote **MUST** be a GCS remote because it's used to maintain state. Currently supports only username/password SFTP authentication. Hidden/system files (.\*) are excluded from the sync.
 
 ## Environment Variables
 
