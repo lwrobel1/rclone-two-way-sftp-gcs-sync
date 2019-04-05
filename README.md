@@ -15,5 +15,7 @@ A dockerized nodejs app which uses [Rclone](https://rclone.org/) to perform a 
 | RCLONE\_SOURCE\_TYPE                       | sftp \| gcs                                                                                   | --                  |
 | RCLONE\_DEST\_TYPE                         | sftp \| gcs                                                                                   | --                  |
 | RCLONE\_SYNC\_PATH                         | Base path to sync                                                                             | /                   |
-| STRATEGY_DELETED                           | match\_source \| match\_dest                                                                  | match\_source         |
-| STRATEGY\_SIZE\_DIFFERENT                  | match\_source \| match\_dest                                                                  | match\_source         |
+| RCLONE\_SYNC\_DIRS                         | list of directories to be synched. If present, only those are synched and in provided order   |                     |
+| STRATEGY_DELETED                           | match\_source \| match\_dest                                                                  | match\_source       |
+| STRATEGY\_SIZE\_DIFFERENT                  | match\_source \| match\_dest                                                                  | match\_source       |
+

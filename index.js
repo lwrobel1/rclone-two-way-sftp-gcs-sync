@@ -36,7 +36,10 @@ const STATE_FILE_PATH = '.state';
 
 var main = (async function () {
 
+
     logConfiguration(logger);
+
+    const directories = getSynchDirs();
 
     process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE;
     const storage = new Storage();
@@ -51,7 +54,7 @@ var main = (async function () {
 
     let lastSync = new Date().getTime();
     if (bucketStateFileExists) {
-        await bucket.file(bucketStateFilePath).download({ destination: STATE_FILE_PATH });
+        await bucket.file(bucketStateFilePath).download({destination: STATE_FILE_PATH});
         lastSync = fs.readFileSync(STATE_FILE_PATH);
     }
 
@@ -71,11 +74,38 @@ var main = (async function () {
     await deleteFiles(filesToDelete);
 
     if (diffMap.size > 0) {
-        await twoWayCopy(sourceUrl, destUrl, Array.from(diffMap.keys()));
+        if (directories != null && directories.length > 0) {
+            directories.forEach(value => {
+                const dirMap = new Map();
+                diffMap.forEach((entry, key) => {
+                    if (entry.includes(value)) {
+                        dirMap.set(entry, key);
+                    }
+                });
+                if(dirMap.size > 0){
+                    await twoWayCopy(sourceUrl, destUrl, Array.from(dirMap.keys()));
+                }
+            });
+        } else {
+            await twoWayCopy(sourceUrl, destUrl, Array.from(diffMap.keys()));
+        }
         await storeStateFile(bucket, bucketStateFilePath);
     }
-
 })();
+
+function getSynchDirs() {
+    return process.env.RCLONE_SYNC_DIRS == '' || process.env.RCLONE_SYNC_DIRS == null || process.env.RCLONE_SYNC_DIRS == undefined ? null : buildDirs(process.env.RCLONE_SYNC_DIRS);
+}
+
+function buildDirs(dirs){
+    if (dirs != null) {
+        const paths = dirs.split(',');
+        return Array.of(paths.forEach(path => {
+            return '/' + path + '/';
+        }));
+    }
+    return null;
+}
 
 function getInitFilePath() {
     return `${process.env.RCLONE_SYNC_PATH}/${STATE_FILE_PATH}`;
@@ -101,6 +131,7 @@ function logConfiguration(logger) {
         RCLONE_SOURCE_TYPE: process.env.RCLONE_SOURCE_TYPE,
         RCLONE_DEST_TYPE: process.env.RCLONE_DEST_TYPE,
         RCLONE_SYNC_PATH: process.env.RCLONE_SYNC_PATH,
+        RCLONE_SYNC_DIRS: process.env.RCLONE_SYNC_DIRS,
         RCLONE_CONFIG_SFTP_HOST: process.env.RCLONE_CONFIG_SFTP_HOST,
         RCLONE_CONFIG_SFTP_PORT: process.env.RCLONE_CONFIG_SFTP_PORT,
         RCLONE_CONFIG_GCS_BUCKET_NAME: process.env.RCLONE_CONFIG_GCS_BUCKET_NAME,
