@@ -73,15 +73,12 @@ var main = (async function () {
 
     await deleteFiles(filesToDelete);
 
+
+
     if (diffMap.size > 0) {
         if (directories != null && directories.length > 0) {
-            directories.forEach(value => {
-                const dirMap = new Map();
-                diffMap.forEach((entry, key) => {
-                    if (entry.includes(value)) {
-                        dirMap.set(entry, key);
-                    }
-                });
+            await asyncForEach(directories, async (pathPart) => {
+                const dirMap = extractWithPathPart(pathPart);
                 if(dirMap.size > 0){
                     await twoWayCopy(sourceUrl, destUrl, Array.from(dirMap.keys()));
                 }
@@ -92,6 +89,22 @@ var main = (async function () {
         await storeStateFile(bucket, bucketStateFilePath);
     }
 })();
+
+function extractWithPathPart(value) {
+    const dirMap = new Map();
+    diffMap.forEach((entry, key) => {
+        if (entry.includes(value)) {
+            dirMap.set(entry, key);
+        }
+    });
+    return dirMap;
+}
+
+async function asyncForEach(array, callback) {
+    for (let index = 0; index < array.length; index++) {
+        await callback(array[index], index, array);
+    }
+}
 
 function getSynchDirs() {
     return process.env.RCLONE_SYNC_DIRS == '' || process.env.RCLONE_SYNC_DIRS == null || process.env.RCLONE_SYNC_DIRS == undefined ? null : buildDirs(process.env.RCLONE_SYNC_DIRS);
