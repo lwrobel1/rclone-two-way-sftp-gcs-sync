@@ -77,7 +77,10 @@ var main = (async function () {
 
     if (diffMap.size > 0) {
         if (directories != null && directories.length > 0) {
+            logger.info('directories');
+            logger.info(directories);
             await asyncForEach(directories, async (pathPart) => {
+                logger.info(pathPart);
                 const dirMap = extractWithPathPart(directories, pathPart);
                 if(dirMap.size > 0){
                     await twoWayCopy(sourceUrl, destUrl, Array.from(dirMap.keys()));
@@ -91,8 +94,15 @@ var main = (async function () {
 })();
 
 function extractWithPathPart(diffMap, value) {
+    logger.info('extractWithPathPart');
+    logger.info(diffMap);
+    logger.info(value);
     const dirMap = new Map();
     diffMap.forEach((entry, key) => {
+        logger.info('diffMap.forEach');
+        logger.info(entry);
+        logger.info(key);
+
         if (entry.includes(value)) {
             dirMap.set(entry, key);
         }
