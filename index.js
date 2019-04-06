@@ -73,15 +73,13 @@ var main = (async function () {
 
     await deleteFiles(filesToDelete);
 
-
-
     if (diffMap.size > 0) {
         if (directories != null && directories.length > 0) {
             logger.info('directories');
             logger.info(directories);
             await asyncForEach(directories, async (pathPart) => {
                 logger.info(pathPart);
-                const dirMap = extractWithPathPart(directories, pathPart);
+                const dirMap = extractWithPathPart(diffMap, pathPart);
                 if(dirMap.size > 0){
                     await twoWayCopy(sourceUrl, destUrl, Array.from(dirMap.keys()));
                 }
@@ -103,7 +101,8 @@ function extractWithPathPart(diffMap, value) {
         logger.info(entry);
         logger.info(key);
 
-        if (entry.includes(value)) {
+        //only not deleted files
+        if ((CONFLICT_TYPE.ADDED == entry.type || CONFLICT_TYPE.SIZE_DIFFERENT == entry.type) && entry.includes(value)) {
             dirMap.set(entry, key);
         }
     });
