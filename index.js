@@ -120,7 +120,7 @@ function buildDirs(dirs){
     if (dirs != null) {
         const paths = dirs.split(',');
         logger.info(paths);
-        return Array.of(paths.forEach(path => {
+        return Array.of(paths.map(path => {
             logger.info('/' + path + '/');
             return '/' + path + '/';
         }));
