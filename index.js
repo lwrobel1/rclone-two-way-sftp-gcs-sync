@@ -119,11 +119,9 @@ function getSynchDirs() {
 function buildDirs(dirs){
     if (dirs != null) {
         const paths = dirs.split(',');
-        logger.info(paths);
-        return Array.of(paths.map(path => {
-            logger.info('/' + path + '/');
+        return paths.map(path => {
             return '/' + path + '/';
-        }));
+        });
     }
     return null;
 }
