@@ -75,11 +75,14 @@ var main = (async function () {
 
     if (diffMap.size > 0) {
         if (directories != null && directories.length > 0) {
-            logger.info('directories');
+            logger.info('directories '+ directories.length);
             logger.info(directories);
             await asyncForEach(directories, async (pathPart) => {
+                logger.info('pathPart');
                 logger.info(pathPart);
                 const dirMap = extractWithPathPart(diffMap, pathPart);
+                logger.info('dirMap ' + dirMap.size);
+                logger.info(dirMap);
                 if(dirMap.size > 0){
                     await twoWayCopy(sourceUrl, destUrl, Array.from(dirMap.keys()));
                 }
@@ -92,17 +95,10 @@ var main = (async function () {
 })();
 
 function extractWithPathPart(diffMap, value) {
-    logger.info('extractWithPathPart');
-    logger.info(diffMap);
-    logger.info(value);
     const dirMap = new Map();
     diffMap.forEach((entry, key) => {
-        logger.info('diffMap.forEach');
-        logger.info(entry);
-        logger.info(key);
-
         //only not deleted files
-        if ((CONFLICT_TYPE.ADDED == entry.type || CONFLICT_TYPE.SIZE_DIFFERENT == entry.type) && entry.includes(value)) {
+        if ((CONFLICT_TYPE.ADDED == entry.type || CONFLICT_TYPE.SIZE_DIFFERENT == entry.type) && key.includes(value)) {
             dirMap.set(entry, key);
         }
     });
@@ -116,13 +112,16 @@ async function asyncForEach(array, callback) {
 }
 
 function getSynchDirs() {
+    logger.info(process.env.RCLONE_SYNC_DIRS);
     return process.env.RCLONE_SYNC_DIRS == '' || process.env.RCLONE_SYNC_DIRS == null || process.env.RCLONE_SYNC_DIRS == undefined ? null : buildDirs(process.env.RCLONE_SYNC_DIRS);
 }
 
 function buildDirs(dirs){
     if (dirs != null) {
         const paths = dirs.split(',');
+        logger.info(paths);
         return Array.of(paths.forEach(path => {
+            logger.info('/' + path + '/');
             return '/' + path + '/';
         }));
     }
