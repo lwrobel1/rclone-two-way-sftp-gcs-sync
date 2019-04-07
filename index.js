@@ -75,14 +75,8 @@ var main = (async function () {
 
     if (diffMap.size > 0) {
         if (directories != null && directories.length > 0) {
-            logger.info('directories '+ directories.length);
-            logger.info(directories);
             await asyncForEach(directories, async (pathPart) => {
-                logger.info('pathPart');
-                logger.info(pathPart);
                 const dirMap = extractWithPathPart(diffMap, pathPart);
-                logger.info('dirMap ' + dirMap.size);
-                logger.info(dirMap);
                 if(dirMap.size > 0){
                     await twoWayCopy(sourceUrl, destUrl, Array.from(dirMap.keys()));
                 }
