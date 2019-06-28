@@ -1,18 +1,18 @@
 const winston = require('winston');
-const {LoggingWinston} = require('@google-cloud/logging-winston')
+const { LoggingWinston } = require('@google-cloud/logging-winston')
 const fs = require('fs');
 const util = require('util');
-const {Storage} = require('@google-cloud/storage');
+const { Storage } = require('@google-cloud/storage');
 
 const loggingWinston = new LoggingWinston();
- 
+
 const logger = winston.createLogger({
-  level: 'info',
-  transports: [
-    new winston.transports.Console(),
-    // Add Stackdriver Logging
-    loggingWinston,
-  ]
+    level: 'info',
+    transports: [
+        new winston.transports.Console(),
+        // Add Stackdriver Logging
+        loggingWinston,
+    ]
 });
 
 const REMOTE_TYPE = {
@@ -36,6 +36,7 @@ const STATE_FILE_PATH = '.state';
 
 var main = (async function () {
 
+    setConfigurationDefaults();
 
     logConfiguration(logger);
 
@@ -54,7 +55,7 @@ var main = (async function () {
 
     let lastSync = new Date().getTime();
     if (bucketStateFileExists) {
-        await bucket.file(bucketStateFilePath).download({destination: STATE_FILE_PATH});
+        await bucket.file(bucketStateFilePath).download({ destination: STATE_FILE_PATH });
         lastSync = fs.readFileSync(STATE_FILE_PATH);
     }
 
@@ -77,7 +78,7 @@ var main = (async function () {
         if (directories != null && directories.length > 0) {
             await asyncForEach(directories, async (pathPart) => {
                 const dirMap = extractWithPathPart(diffMap, pathPart);
-                if(dirMap.size > 0){
+                if (dirMap.size > 0) {
                     await twoWayCopy(sourceUrl, destUrl, Array.from(dirMap.keys()));
                 }
             });
@@ -110,7 +111,7 @@ function getSynchDirs() {
     return process.env.RCLONE_SYNC_DIRS == '' || process.env.RCLONE_SYNC_DIRS == null || process.env.RCLONE_SYNC_DIRS == undefined ? null : buildDirs(process.env.RCLONE_SYNC_DIRS);
 }
 
-function buildDirs(dirs){
+function buildDirs(dirs) {
     if (dirs != null) {
         const paths = dirs.split(',');
         return paths.map(path => {
@@ -139,15 +140,34 @@ async function bucketFileExists(bucket, bucketFilePath) {
     }
 }
 
+function setConfigurationDefaults() {
+    if (!process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE) {
+        process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE = '/config/gcs_sa.json';
+    }
+    if (!process.env.RCLONE_CONFIG_SFTP_PORT) {
+        process.env.RCLONE_CONFIG_SFTP_PORT = '22';
+    }
+    if (!process.env.RCLONE_SYNC_PATH) {
+        process.env.RCLONE_SYNC_PATH = '/';
+    }
+    if (!process.env.STRATEGY_DELETED) {
+        process.env.STRATEGY_DELETED = CONFLICT_STRATEGY.FROM_DEST;
+    }
+    if (!process.env.STRATEGY_SIZE_DIFFERENT) {
+        process.env.STRATEGY_SIZE_DIFFERENT = CONFLICT_STRATEGY.FROM_SOURCE;
+    }
+}
+
 function logConfiguration(logger) {
     const config = {
+        RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE: process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE,
+        RCLONE_CONFIG_GCS_BUCKET_NAME: process.env.RCLONE_CONFIG_GCS_BUCKET_NAME,
+        RCLONE_CONFIG_SFTP_HOST: process.env.RCLONE_CONFIG_SFTP_HOST,
+        RCLONE_CONFIG_SFTP_PORT: process.env.RCLONE_CONFIG_SFTP_PORT,
         RCLONE_SOURCE_TYPE: process.env.RCLONE_SOURCE_TYPE,
         RCLONE_DEST_TYPE: process.env.RCLONE_DEST_TYPE,
         RCLONE_SYNC_PATH: process.env.RCLONE_SYNC_PATH,
         RCLONE_SYNC_DIRS: process.env.RCLONE_SYNC_DIRS,
-        RCLONE_CONFIG_SFTP_HOST: process.env.RCLONE_CONFIG_SFTP_HOST,
-        RCLONE_CONFIG_SFTP_PORT: process.env.RCLONE_CONFIG_SFTP_PORT,
-        RCLONE_CONFIG_GCS_BUCKET_NAME: process.env.RCLONE_CONFIG_GCS_BUCKET_NAME,
         STRATEGY_DELETED: process.env.STRATEGY_DELETED,
         STRATEGY_SIZE_DIFFERENT: process.env.STRATEGY_SIZE_DIFFERENT
     };
@@ -182,7 +202,8 @@ async function twoWayCopy(sourceUrl, destUrl, files) {
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
     // possible fix: https://github.com/ncw/rclone/pull/3009
-    const commonArgs = ['copy', '--min-size', '12b', '--fast-list', '--no-update-modtime', '--include-from', includeFilePath, '--ignore-case'];
+    logger.info('includeFilePath:' + includeFilePath);
+    const commonArgs = ['copy', '--min-size', '12b', '--fast-list', '--no-update-modtime', '--ignore-case', '--filter-from', 'rclone-filter.txt'];
 
     const sourceToDestArgs = commonArgs.slice(0);
     if (process.env.STRATEGY_SIZE_DIFFERENT != CONFLICT_STRATEGY.FROM_SOURCE) {
@@ -208,7 +229,8 @@ async function calculateDiff(sourceUrl, destUrl, lastSync, bucketStateFileExists
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
     // possible fix: https://github.com/ncw/rclone/pull/3009
-    const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list', '--exclude', '.*'];
+
+    const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list', '--filter-from', 'rclone-filter.txt'];
 
     const sourceLsjsonArgs = commonArgs.slice(0);
     sourceLsjsonArgs.push(sourceUrl);
