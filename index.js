@@ -151,7 +151,7 @@ function setConfigurationDefaults() {
         process.env.RCLONE_SYNC_PATH = '/';
     }
     if (!process.env.STRATEGY_DELETED) {
-        process.env.STRATEGY_DELETED = CONFLICT_STRATEGY.FROM_DEST;
+        process.env.STRATEGY_DELETED = CONFLICT_STRATEGY.FROM_SOURCE;
     }
     if (!process.env.STRATEGY_SIZE_DIFFERENT) {
         process.env.STRATEGY_SIZE_DIFFERENT = CONFLICT_STRATEGY.FROM_SOURCE;
