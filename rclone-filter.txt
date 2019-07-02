@@ -1,3 +1,2 @@
 - lost+found/**
-+ .include
 - .*

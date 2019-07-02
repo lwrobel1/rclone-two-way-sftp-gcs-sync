@@ -34,13 +34,15 @@ const CONFLICT_TYPE = {
 
 const STATE_FILE_PATH = '.state';
 
+const INCLUDE_FILE_PATH = '.include';
+
 var main = (async function () {
 
     setConfigurationDefaults();
 
-    logConfiguration(logger);
+    prepareIncludeFile();
 
-    const directories = getSynchDirs();
+    logConfiguration(logger);
 
     process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE;
     const storage = new Storage();
@@ -60,7 +62,7 @@ var main = (async function () {
     }
 
     const diffMap = await calculateDiff(sourceUrl, destUrl, lastSync, bucketStateFileExists);
-    logger.info(util.format(diffMap));
+    logger.info("diffMap: " + util.format(diffMap));
 
     const filesToDelete = new Map();
 
@@ -75,50 +77,15 @@ var main = (async function () {
     await deleteFiles(filesToDelete);
 
     if (diffMap.size > 0) {
-        if (directories != null && directories.length > 0) {
-            await asyncForEach(directories, async (pathPart) => {
-                const dirMap = extractWithPathPart(diffMap, pathPart);
-                if (dirMap.size > 0) {
-                    await twoWayCopy(sourceUrl, destUrl, Array.from(dirMap.keys()));
-                }
-            });
-        } else {
-            await twoWayCopy(sourceUrl, destUrl, Array.from(diffMap.keys()));
-        }
+        await twoWayCopy(sourceUrl, destUrl, Array.from(diffMap.keys()));
         await storeStateFile(bucket, bucketStateFilePath);
     }
 })();
-
-function extractWithPathPart(diffMap, value) {
-    const dirMap = new Map();
-    diffMap.forEach((entry, key) => {
-        //only not deleted files
-        if ((CONFLICT_TYPE.ADDED == entry.type || CONFLICT_TYPE.SIZE_DIFFERENT == entry.type) && key.includes(value)) {
-            dirMap.set(entry, key);
-        }
-    });
-    return dirMap;
-}
 
 async function asyncForEach(array, callback) {
     for (let index = 0; index < array.length; index++) {
         await callback(array[index], index, array);
     }
-}
-
-function getSynchDirs() {
-    logger.info(process.env.RCLONE_SYNC_DIRS);
-    return process.env.RCLONE_SYNC_DIRS == '' || process.env.RCLONE_SYNC_DIRS == null || process.env.RCLONE_SYNC_DIRS == undefined ? null : buildDirs(process.env.RCLONE_SYNC_DIRS);
-}
-
-function buildDirs(dirs) {
-    if (dirs != null) {
-        const paths = dirs.split(',');
-        return paths.map(path => {
-            return '/' + path + '/';
-        });
-    }
-    return null;
 }
 
 function getInitFilePath() {
@@ -140,6 +107,26 @@ async function bucketFileExists(bucket, bucketFilePath) {
     }
 }
 
+function prepareIncludeFile() {
+    var dirs = process.env.RCLONE_SYNC_DIRS;
+
+    var paths = ["*"];
+    if (dirs != '' && dirs != null && dirs != undefined) {
+        var pathsArray = dirs.split(',');
+        paths = pathsArray.map(path => {
+            if (!path.endsWith("/")) {
+                path = path + "/";
+            }
+            return path + "**";
+        });
+    }
+
+    fs.writeFileSync(INCLUDE_FILE_PATH, '');
+    paths.forEach(file => {
+        fs.appendFileSync(INCLUDE_FILE_PATH, file + '\r\n');
+    });
+}
+
 function setConfigurationDefaults() {
     if (!process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE) {
         process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE = '/config/gcs_sa.json';
@@ -151,7 +138,7 @@ function setConfigurationDefaults() {
         process.env.RCLONE_SYNC_PATH = '/';
     }
     if (!process.env.STRATEGY_DELETED) {
-        process.env.STRATEGY_DELETED = CONFLICT_STRATEGY.FROM_SOURCE;
+        process.env.STRATEGY_DELETED = CONFLICT_STRATEGY.FROM_DEST;
     }
     if (!process.env.STRATEGY_SIZE_DIFFERENT) {
         process.env.STRATEGY_SIZE_DIFFERENT = CONFLICT_STRATEGY.FROM_SOURCE;
@@ -171,7 +158,7 @@ function logConfiguration(logger) {
         STRATEGY_DELETED: process.env.STRATEGY_DELETED,
         STRATEGY_SIZE_DIFFERENT: process.env.STRATEGY_SIZE_DIFFERENT
     };
-    logger.info(config);
+    logger.info("configuration: " + config);
 }
 
 async function obscurePassword(password) {
@@ -192,18 +179,10 @@ async function deleteFiles(filesToDelete) {
 
 async function twoWayCopy(sourceUrl, destUrl, files) {
 
-    const includeFilePath = '.include';
-    fs.writeFileSync(includeFilePath, '');
-    files.forEach(file => {
-        fs.appendFileSync(includeFilePath, file);
-        fs.appendFileSync(includeFilePath, '\r\n');
-    });
-
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
     // possible fix: https://github.com/ncw/rclone/pull/3009
-    logger.info('includeFilePath:' + includeFilePath);
-    const commonArgs = ['copy', '--min-size', '12b', '--fast-list', '--no-update-modtime', '--ignore-case', '--filter-from', 'rclone-filter.txt'];
+    const commonArgs = ['copy', '--min-size', '12b', '--fast-list', '--no-update-modtime', '--ignore-case', '--include-from', INCLUDE_FILE_PATH, '--filter-from', 'rclone-filter.txt'];
 
     const sourceToDestArgs = commonArgs.slice(0);
     if (process.env.STRATEGY_SIZE_DIFFERENT != CONFLICT_STRATEGY.FROM_SOURCE) {
@@ -211,7 +190,7 @@ async function twoWayCopy(sourceUrl, destUrl, files) {
     }
     sourceToDestArgs.push(sourceUrl);
     sourceToDestArgs.push(destUrl);
-    logger.info(sourceToDestArgs);
+    logger.info("sourceToDestArgs: " + sourceToDestArgs);
     await spawnAndCaptureStdout('rclone', sourceToDestArgs);
 
     const destToSourceArgs = commonArgs.slice(0);
@@ -220,7 +199,7 @@ async function twoWayCopy(sourceUrl, destUrl, files) {
     }
     destToSourceArgs.push(destUrl);
     destToSourceArgs.push(sourceUrl);
-    logger.info(destToSourceArgs);
+    logger.info("destToSourceArgs: " + destToSourceArgs);
     await spawnAndCaptureStdout('rclone', destToSourceArgs);
 }
 
@@ -230,16 +209,16 @@ async function calculateDiff(sourceUrl, destUrl, lastSync, bucketStateFileExists
     // FIXME:
     // possible fix: https://github.com/ncw/rclone/pull/3009
 
-    const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list', '--filter-from', 'rclone-filter.txt'];
+    const commonArgs = ['lsjson', '-R', '--min-size', '12b', '--fast-list', '--include-from', INCLUDE_FILE_PATH, '--filter-from', 'rclone-filter.txt'];
 
     const sourceLsjsonArgs = commonArgs.slice(0);
     sourceLsjsonArgs.push(sourceUrl);
-    logger.info(sourceLsjsonArgs);
+    logger.info("sourceLsjsonArgs: " + sourceLsjsonArgs);
     const sourceLsjsonOut = await spawnAndCaptureStdout('rclone', sourceLsjsonArgs);
 
     const destLsjsonArgs = commonArgs.slice(0);
     destLsjsonArgs.push(destUrl);
-    logger.info(destLsjsonArgs);
+    logger.info("destLsjsonArgs: " + destLsjsonArgs);
     const destLsjsonOut = await spawnAndCaptureStdout('rclone', destLsjsonArgs);
 
     const sourceLsjson = JSON.parse(sourceLsjsonOut);
