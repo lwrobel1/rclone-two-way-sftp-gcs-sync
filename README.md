@@ -4,16 +4,18 @@ A dockerized nodejs app which uses [Rclone](https://rclone.org/) to perform a 
 
 ## Environment Variables
 
-| Name                                       | Description                                                                                   | Default Value       |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------- |
-| RCLONE\_CONFIG\_GCS\_SERVICE\_ACCOUNT_FILE | Path to the Service Account JSON file with access to GCS. Can be mounted using /config volume | /config/gcs_sa.json |
-| RCLONE\_CONFIG\_GCS\_BUCKET\_NAME          | Name of the GCS bucket                                                                        | --                  |
-| RCLONE\_CONFIG\_SFTP_HOST                  | SFTP IP/host                                                                                  | --                  |
-| RCLONE\_CONFIG\_SFTP_PORT                  | SFTP port                                                                                     | 22                  |
-| RCLONE\_CONFIG\_SFTP_USER                  | SFTP username                                                                                 | --                  |
-| RCLONE\_CONFIG\_SFTP\_PASS\_PLAIN          | SFTP password (plain)                                                                         | --                  |
-| RCLONE\_SOURCE\_TYPE                       | sftp \| gcs                                                                                   | --                  |
-| RCLONE\_DEST\_TYPE                         | sftp \| gcs                                                                                   | --                  |
-| RCLONE\_SYNC\_PATH                         | Base path to sync                                                                             | /                   |
-| STRATEGY_DELETED                           | match\_source \| match\_dest                                                                  | match\_source         |
-| STRATEGY\_SIZE\_DIFFERENT                  | match\_source \| match\_dest                                                                  | match\_source         |
+| Name                                        | Description                                                                                    | Default Value        |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------- |
+| RCLONE\_CONFIG\_GCS\_SERVICE\_ACCOUNT\_FILE | Path to the Service Account JSON file with access to GCS. Can be mounted using /config volume  | /config/gcs\_sa.json |
+| RCLONE\_CONFIG\_GCS\_BUCKET\_NAME           | Name of the GCS bucket                                                                         | --                   |
+| RCLONE\_CONFIG\_SFTP_HOST                   | SFTP IP/host                                                                                   | --                   |
+| RCLONE\_CONFIG\_SFTP_PORT                   | SFTP port                                                                                      | 22                   |
+| RCLONE\_CONFIG\_SFTP_USER                   | SFTP username                                                                                  | --                   |
+| RCLONE\_CONFIG\_SFTP\_PASS\_PLAIN           | SFTP password (plain)                                                                          | --                   |
+| RCLONE\_SOURCE\_TYPE                        | sftp \| gcs                                                                                    | --                   |
+| RCLONE\_DEST\_TYPE                          | sftp \| gcs                                                                                    | --                   |
+| RCLONE\_SYNC\_PATH                          | Base path to sync                                                                              | /                    |
+| RCLONE\_SYNC\_DIRS                          | list of directories to be synched. If present, only those are synched and in provided order    |                      |
+| STRATEGY\_DELETED                           | match\_source \| match\_dest                                                                   | match\_source        |
+| STRATEGY\_SIZE\_DIFFERENT                   | match\_source \| match\_dest                                                                   | match\_source        |
+
