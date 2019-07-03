@@ -40,8 +40,6 @@ var main = (async function () {
 
     setConfigurationDefaults();
 
-    prepareIncludeFile();
-
     logConfiguration(logger);
 
     process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.RCLONE_CONFIG_GCS_SERVICE_ACCOUNT_FILE;
@@ -77,16 +75,62 @@ var main = (async function () {
     await deleteFiles(filesToDelete);
 
     if (diffMap.size > 0) {
-        await twoWayCopy(sourceUrl, destUrl, Array.from(diffMap.keys()));
+        const directories = getSynchDirs();
+        if (directories != null && directories.length > 0) {
+            await asyncForEach(directories, async (pathPart) => {
+                const resourcesArray = extractWithPathPart(diffMap, pathPart);
+                if (resourcesArray.length > 0) {
+                    logger.info("synchronizing directory: " + pathPart);
+                    await twoWayCopy(sourceUrl, destUrl, resourcesArray);
+                }
+            });
+        } else {
+            await twoWayCopy(sourceUrl, destUrl, Array.from(diffMap.keys()));
+        }
         await storeStateFile(bucket, bucketStateFilePath);
     }
 })();
+
+function extractWithPathPart(diffMap, value) {
+    const resourcesArray = [];
+    diffMap.forEach((entry, key) => {
+        if (!key.startsWith("/")) {
+            key = "/" + key;
+        }
+        if (key.includes(value)) {
+            resourcesArray.push(key);
+        }
+    });
+    return resourcesArray;
+}
+
 
 async function asyncForEach(array, callback) {
     for (let index = 0; index < array.length; index++) {
         await callback(array[index], index, array);
     }
 }
+
+function getSynchDirs() {
+    return process.env.RCLONE_SYNC_DIRS == '' || process.env.RCLONE_SYNC_DIRS == null || process.env.RCLONE_SYNC_DIRS == undefined ? null : buildDirs(process.env.RCLONE_SYNC_DIRS);
+}
+
+function buildDirs(dirs) {
+    if (dirs != null) {
+        const paths = dirs.split(',');
+        return paths.map(path => {
+            if (!path.startsWith("/")) {
+                path = "/" + path;
+            }
+            if (!path.endsWith("/")) {
+                path = path + "/";
+            }
+            return path;
+        });
+    }
+    return null;
+}
+
 
 function getInitFilePath() {
     return `${process.env.RCLONE_SYNC_PATH}/${STATE_FILE_PATH}`;
@@ -105,26 +149,6 @@ async function bucketFileExists(bucket, bucketFilePath) {
     } else {
         return false;
     }
-}
-
-function prepareIncludeFile() {
-    var dirs = process.env.RCLONE_SYNC_DIRS;
-
-    var paths = ["*"];
-    if (dirs != '' && dirs != null && dirs != undefined) {
-        var pathsArray = dirs.split(',');
-        paths = pathsArray.map(path => {
-            if (!path.endsWith("/")) {
-                path = path + "/";
-            }
-            return path + "**";
-        });
-    }
-
-    fs.writeFileSync(INCLUDE_FILE_PATH, '');
-    paths.forEach(file => {
-        fs.appendFileSync(INCLUDE_FILE_PATH, file + '\r\n');
-    });
 }
 
 function setConfigurationDefaults() {
@@ -158,7 +182,7 @@ function logConfiguration(logger) {
         STRATEGY_DELETED: process.env.STRATEGY_DELETED,
         STRATEGY_SIZE_DIFFERENT: process.env.STRATEGY_SIZE_DIFFERENT
     };
-    logger.info("configuration: " + config);
+    logger.info("configuration: " + util.format(config));
 }
 
 async function obscurePassword(password) {
@@ -178,6 +202,8 @@ async function deleteFiles(filesToDelete) {
 }
 
 async function twoWayCopy(sourceUrl, destUrl, files) {
+
+    createIncludeFile(files);
 
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
@@ -204,6 +230,8 @@ async function twoWayCopy(sourceUrl, destUrl, files) {
 }
 
 async function calculateDiff(sourceUrl, destUrl, lastSync, bucketStateFileExists) {
+
+    prepareDiffIncludeFile();
 
     // --min-size 12b used as a workaround for rclone not being able to handle empty directory objects on gcs (sized 11 bytes)
     // FIXME:
@@ -303,4 +331,28 @@ function buildRemoteUrl(type, path) {
     } else if (type == REMOTE_TYPE.GCS) {
         return `${REMOTE_TYPE.GCS}:${process.env.RCLONE_CONFIG_GCS_BUCKET_NAME}${path}`;
     }
+}
+
+function prepareDiffIncludeFile() {
+    var dirs = process.env.RCLONE_SYNC_DIRS;
+
+    var paths = ["*"];
+    if (dirs != '' && dirs != null && dirs != undefined) {
+        var pathsArray = dirs.split(',');
+        paths = pathsArray.map(path => {
+            if (!path.endsWith("/")) {
+                path = path + "/";
+            }
+            return path + "**";
+        });
+    }
+
+    createIncludeFile(paths);
+}
+
+function createIncludeFile(resources){
+    fs.writeFileSync(INCLUDE_FILE_PATH, '');
+    resources.forEach(file => {
+        fs.appendFileSync(INCLUDE_FILE_PATH, file + '\r\n');
+    });
 }
