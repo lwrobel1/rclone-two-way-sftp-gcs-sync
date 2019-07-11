@@ -11,7 +11,7 @@ node {
         /* This builds the actual image; synonymous to
          * docker build on the command line */
 
-        app = docker.build("rclone-two-way-sftp-gcs-sync:${env.BUILD_ID}")
+        app = docker.build("wojtas/rclone-two-way-sftp-gcs-sync:${env.BUILD_ID}")
     }
 
     stage('Push image') {
