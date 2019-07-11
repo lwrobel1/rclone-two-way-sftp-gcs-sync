@@ -23,10 +23,12 @@ node {
             version = 'latest-dev'
         } else if (${env.BRANCH_NAME} == "master") {
             version = 'latest'
-        }else {
-            return 'test'
+        } else {
+            currentBuild.result = 'SUCCESS'
+            return
         }
-        app = docker.build("ctrewe/rclone-two-way-sftp-gcs-sync:${version}")
+
+        app = docker.build("ctrewe/rclone-two-way-sftp-gcs-sync:" + ${version})
     }
 
     stage('Push image') {
