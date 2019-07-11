@@ -18,9 +18,9 @@ node {
          * docker build on the command line */
 
         def version = ''
-        if ("${env.BRANCH_NAME}"" == "develop") {
+        if ("${env.BRANCH_NAME}" == "develop") {
             version = 'latest-dev'
-        } else if ("${env.BRANCH_NAME}"" == "master") {
+        } else if ("${env.BRANCH_NAME}" == "master") {
             version = 'latest'
         } else {
             currentBuild.result = 'SUCCESS'
