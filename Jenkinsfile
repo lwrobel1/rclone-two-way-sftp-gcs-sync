@@ -5,7 +5,7 @@ node {
     stage('Log variables') {
         /* Let's make sure we have the repository cloned to our workspace */
 
-        printParams()
+        sh 'printenv'
     }
 
     stage('Clone repository') {
@@ -42,6 +42,6 @@ def getVersion() {
     }
 }
 
-def printParams() {
-    env.getEnvironment().each { name, value -> println "Name: $name -> Value $value" }
-}
+// def printParams() {
+//     env.getEnvironment().each { name, value -> println "Name: $name -> Value $value" }
+// }
