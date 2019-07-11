@@ -2,11 +2,6 @@ node {
     def app
     def buildCancelled = false
 
-    @NonCPS
-    def printParams() {
-        env.getEnvironment().each { name, value -> println "Name: $name -> Value $value" }
-    }
-
     stage('Log variables') {
         /* Let's make sure we have the repository cloned to our workspace */
 
@@ -45,4 +40,8 @@ def getVersion() {
         buildCancelled = true
         return ''
     }
+}
+
+def printParams() {
+    env.getEnvironment().each { name, value -> println "Name: $name -> Value $value" }
 }
